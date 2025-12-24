@@ -84,10 +84,13 @@ public class ExperimentalToolGUI extends JFrame {
         clearButton.addActionListener(e -> inputTextArea.setText(""));
         JButton validateButton = new JButton("Validate Input");
         validateButton.addActionListener(e -> validateInput());
+        JButton generateRandomButton = new JButton("Generate Random Input");
+        generateRandomButton.addActionListener(e -> generateRandomInput());
 
         inputButtonPanel.add(loadFileButton);
         inputButtonPanel.add(clearButton);
         inputButtonPanel.add(validateButton);
+        inputButtonPanel.add(generateRandomButton);
 
         // Add components to input panel
         inputPanel.add(formatPanel, BorderLayout.NORTH);
@@ -506,5 +509,50 @@ public class ExperimentalToolGUI extends JFrame {
      */
     private void showWarning(String title, String message) {
         JOptionPane.showMessageDialog(this, message, title, JOptionPane.WARNING_MESSAGE);
+    }
+
+    /**
+     * Generates random network traffic data and displays it in the input text area
+     */
+    private void generateRandomInput() {
+        // Define possible values for categorical features
+        String[] protocolTypes = {"tcp", "udp", "icmp"};
+        String[] services = {"http", "ftp", "smtp", "ssh", "dns", "telnet", "pop3", "imap"};
+        String[] flags = {"SF", "S0", "REJ", "RSTO", "RSTR", "SH", "RSTRH", "OTH"};
+
+        // Generate random values
+        Random random = new Random();
+        int duration = random.nextInt(1000);
+        String protocolType = protocolTypes[random.nextInt(protocolTypes.length)];
+        String service = services[random.nextInt(services.length)];
+        String flag = flags[random.nextInt(flags.length)];
+        int srcBytes = random.nextInt(10000);
+        int dstBytes = random.nextInt(10000);
+
+        // Format the data according to the selected input format
+        StringBuilder randomData = new StringBuilder();
+
+        if (keyValueRadio.isSelected()) {
+            // Key-value format
+            randomData.append("duration: ").append(duration)
+                    .append(" protocol_type: ").append(protocolType)
+                    .append(" service: ").append(service)
+                    .append(" flag: ").append(flag)
+                    .append(" src_bytes: ").append(srcBytes)
+                    .append(" dst_bytes: ").append(dstBytes);
+        } else {
+            // CSV format
+            randomData.append("duration,protocol_type,service,flag,src_bytes,dst_bytes\n")
+                    .append(duration).append(",")
+                    .append(protocolType).append(",")
+                    .append(service).append(",")
+                    .append(flag).append(",")
+                    .append(srcBytes).append(",")
+                    .append(dstBytes);
+        }
+
+        // Set the generated data to the input text area
+        inputTextArea.setText(randomData.toString());
+        updateStatus("Random network traffic data generated.");
     }
 }
