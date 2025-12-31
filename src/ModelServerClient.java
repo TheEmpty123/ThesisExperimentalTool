@@ -442,4 +442,126 @@ public class ModelServerClient {
         }
         return defaultValue;
     }
+
+    /**
+     * Checks the health status of the Python Model Server
+     * 
+     * @param serverUrl The base URL of the Python Model Server (without the endpoint)
+     * @return The server health status
+     */
+    public ServerHealthStatus checkServerHealth(String serverUrl) {
+        // Extract the base URL (remove "/predict" if present)
+        String baseUrl = serverUrl;
+        if (baseUrl.endsWith("/predict")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 8); // Remove "/predict"
+        }
+
+        // Ensure the URL doesn't end with a slash
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+
+        // Append the health endpoint
+        String healthUrl = baseUrl + "/health";
+
+        try {
+            // Build the HTTP request
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(healthUrl))
+                    .timeout(Duration.ofSeconds(timeout))
+                    .GET()
+                    .build();
+
+            // Send the request with retries
+            HttpResponse<String> response = sendWithRetries(request);
+
+            // Check if the request was successful
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                try {
+//                    // Parse the JSON response
+//                    Map<String, Object> jsonValues = parseJsonResponse(response.body());
+//
+//                    // Extract health status values
+//                    String status = getStringValue(jsonValues, "status", "unknown");
+//                    int totalFeatures = getIntValue(jsonValues, "total_features", 0);
+//
+//                    // Extract models_loaded values (nested map)
+//                    @SuppressWarnings("unchecked")
+//                    Map<String, Object> modelsLoaded =
+//                            (Map<String, Object>) jsonValues.get("models_loaded");
+//
+//                    boolean encoderLoaded = Boolean.TRUE.equals(modelsLoaded.get("encoder"));
+//                    boolean featuresLoaded = Boolean.TRUE.equals(modelsLoaded.get("features"));
+//                    boolean modelLoaded = Boolean.TRUE.equals(modelsLoaded.get("model"));
+//                    boolean scalerLoaded = Boolean.TRUE.equals(modelsLoaded.get("scaler"));
+
+                    String body = response.body();
+                    // Use regex to extract values
+                    String status = "unknown";
+                    int totalFeatures = 0;
+                    boolean encoderLoaded = false;
+                    boolean featuresLoaded = false;
+                    boolean modelLoaded = false;
+                    boolean scalerLoaded = false;
+                    Pattern statusPattern = Pattern.compile("\"status\"\\s*:\\s*\"([^\"]+)\"");
+                    Matcher statusMatcher = statusPattern.matcher(body);
+                    if (statusMatcher.find()) {
+                        status = statusMatcher.group(1);
+                    }
+                    Pattern totalFeaturesPattern = Pattern.compile("\"total_features\"\\s*:\\s*(\\d+)");
+                    Matcher totalFeaturesMatcher = totalFeaturesPattern.matcher(body);
+                    if (totalFeaturesMatcher.find()) {
+                        totalFeatures = Integer.parseInt(totalFeaturesMatcher.group(1));
+                    }
+                    Pattern modelsLoadedPattern = Pattern.compile("\"models_loaded\"\\s*:\\s*\\{(.*?)\\}");
+                    Matcher modelsLoadedMatcher = modelsLoadedPattern.matcher(body);
+                    if (modelsLoadedMatcher.find()) {
+                        String modelsLoadedContent = modelsLoadedMatcher.group(1);
+                        Pattern modelPattern = Pattern.compile("\"(encoder|features|model|scaler)\"\\s*:\\s*(true|false)");
+                        Matcher modelMatcher = modelPattern.matcher(modelsLoadedContent);
+                        while (modelMatcher.find()) {
+                            String modelName = modelMatcher.group(1);
+                            boolean isLoaded = "true".equals(modelMatcher.group(2));
+                            switch (modelName) {
+                                case "encoder":
+                                    encoderLoaded = isLoaded;
+                                    break;
+                                case "features":
+                                    featuresLoaded = isLoaded;
+                                    break;
+                                case "model":
+                                    modelLoaded = isLoaded;
+                                    break;
+                                case "scaler":
+                                    scalerLoaded = isLoaded;
+                                    break;
+                            }
+                        }
+                    }
+
+                    // Create and return the health status
+                    return new ServerHealthStatus(
+                            encoderLoaded, featuresLoaded, modelLoaded, scalerLoaded,
+                            status, totalFeatures);
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                    return new ServerHealthStatus("Error parsing response: " + e.getMessage());
+                }
+            } else {
+                // Handle error response
+                return new ServerHealthStatus("Server error: " + response.statusCode() + " - " + response.body());
+            }
+        } catch (ConnectException e) {
+            return new ServerHealthStatus("Connection error: Could not connect to server at " + healthUrl);
+        } catch (TimeoutException e) {
+            return new ServerHealthStatus("Timeout error: Server did not respond within " + timeout + " seconds");
+        } catch (IOException e) {
+            return new ServerHealthStatus("I/O error: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new ServerHealthStatus("Request interrupted: " + e.getMessage());
+        } catch (Exception e) {
+            return new ServerHealthStatus("Error: " + e.getMessage());
+        }
+    }
 }
