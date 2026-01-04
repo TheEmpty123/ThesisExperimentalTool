@@ -1,3 +1,5 @@
+
+import utils.LogObj;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
@@ -81,10 +83,16 @@ public class ExperimentalToolGUI extends JFrame {
     private JMenuItem exportMenuItem;
     private JMenuItem batchProcessMenuItem;
 
+    // Logger
+    private static final LogObj log = new LogObj("ExperimentalToolGUI");
+
     /**
      * Constructor - initializes the GUI components
      */
     public ExperimentalToolGUI() {
+
+        log.info("Initializing Experimental Tool GUI");
+
         // Initialize the HTTP client
         client = new ModelServerClient();
         currentResults = new ArrayList<>();
@@ -145,6 +153,9 @@ public class ExperimentalToolGUI extends JFrame {
      * Sets up the menu bar with File and Tools menus
      */
     private void setupMenuBar() {
+
+        log.info("Setting up menu bar");
+
         JMenuBar menuBar = new JMenuBar();
 
         // File menu
@@ -179,6 +190,8 @@ public class ExperimentalToolGUI extends JFrame {
      * @return The input panel
      */
     private JPanel createInputPanel() {
+        log.info("Creating input panel");
+
         JPanel inputPanel = new JPanel(new BorderLayout(5, 5));
         inputPanel.setBorder(BorderFactory.createTitledBorder("Manual Input Features"));
 
@@ -736,6 +749,9 @@ public class ExperimentalToolGUI extends JFrame {
      * @return The result panel
      */
     private JPanel createResultPanel() {
+
+        log.info("Creating result panel");
+
         JPanel resultPanel = new JPanel(new BorderLayout(5, 5));
         resultPanel.setBorder(BorderFactory.createTitledBorder("Visual Results Dashboard"));
 
@@ -832,6 +848,9 @@ public class ExperimentalToolGUI extends JFrame {
      * Shows the batch process dialog
      */
     private void showBatchProcessDialog() {
+
+        log.info("Showing batch process dialog");
+
         JDialog batchDialog = new JDialog(this, "Batch Process Viewer", true);
         batchDialog.setSize(800, 600);
         batchDialog.setLocationRelativeTo(this);
@@ -906,6 +925,8 @@ public class ExperimentalToolGUI extends JFrame {
      * Loads a batch file for processing
      */
     private void loadBatchFile() {
+        log.info("Loading batch file");
+
         JFileChooser fileChooser = new JFileChooser();
 
         // Set up file filters based on selected format
@@ -942,6 +963,8 @@ public class ExperimentalToolGUI extends JFrame {
      * Processes a batch of inputs
      */
     private void processBatch() {
+        log.info("Processing batch process");
+
         String inputData = batchInputTextArea.getText().trim();
         String serverUrl = serverUrlField.getText().trim();
 
@@ -1022,6 +1045,9 @@ public class ExperimentalToolGUI extends JFrame {
      * Predicts a single input from the form
      */
     private void predictSingle() {
+
+        log.info("Predicting single input");
+
         String serverUrl = serverUrlField.getText().trim();
 
         if (serverUrl.isEmpty()) {
@@ -1107,6 +1133,9 @@ public class ExperimentalToolGUI extends JFrame {
      * @param result The prediction result to display
      */
     private void updateDashboard(PredictionResult result) {
+
+        log.info("Updating dashboard with prediction result");
+
         if ("error".equals(result.getStatus())) {
             resultLabel.setText("ERROR");
             resultLabel.setForeground(Color.ORANGE);
@@ -1142,6 +1171,9 @@ public class ExperimentalToolGUI extends JFrame {
      * @param attackProb Probability of attack
      */
     private void updateProbabilityBar(double normalProb, double attackProb) {
+
+        log.info("Updating probability bar");
+
         final double normalRatio = normalProb;
 
         probabilityBarPanel = new JPanel() {
@@ -1196,6 +1228,8 @@ public class ExperimentalToolGUI extends JFrame {
      * Loads test data from a file
      */
     private void loadFromFile() {
+        log.info("Loading test data from file");
+
         JFileChooser fileChooser = new JFileChooser();
         FileNameExtensionFilter csvFilter = new FileNameExtensionFilter("CSV Files (*.csv)", "csv");
         fileChooser.setFileFilter(csvFilter);
@@ -1221,6 +1255,9 @@ public class ExperimentalToolGUI extends JFrame {
      * Exports the current results to a CSV file
      */
     private void exportResults() {
+
+        log.info("Exporting results");
+
         if (currentResults.isEmpty()) {
             showWarning("No Results", "There are no results to export.");
             return;
@@ -1268,6 +1305,9 @@ public class ExperimentalToolGUI extends JFrame {
      * @param result The prediction result to display
      */
     private void displayResult(PredictionResult result) {
+
+        log.info("Displaying prediction result in table");
+
         // Add to table
         if ("error".equals(result.getStatus())) {
             Object[] rowData = {"Error", "Error", 0.0, 0.0, 0.0, result.getErrorMessage()};
@@ -1289,6 +1329,9 @@ public class ExperimentalToolGUI extends JFrame {
      * Clears all results from the table
      */
     private void clearResults() {
+
+        log.info("Clearing results");
+
         resultsTableModel.setRowCount(0);
         currentResults.clear();
         exportMenuItem.setEnabled(false);
@@ -1327,6 +1370,9 @@ public class ExperimentalToolGUI extends JFrame {
      * Generates random network traffic data and fills the form fields
      */
     private void generateRandomInput() {
+
+        log.info("Generating new random input from file");
+
         // Define possible values for categorical features
         String[] protocolTypes = {"tcp", "udp", "icmp"};
         String[] services = {"http", "ftp", "smtp", "ssh", "dns", "telnet", "pop3", "imap"};
@@ -1473,6 +1519,9 @@ public class ExperimentalToolGUI extends JFrame {
      * and displays the results in a dialog
      */
     private void checkServerHealth() {
+
+        log.info("Checking server health");
+
         String serverUrl = serverUrlField.getText().trim();
 
         if (serverUrl.isEmpty()) {
@@ -1510,6 +1559,9 @@ public class ExperimentalToolGUI extends JFrame {
      * @param healthStatus The server health status
      */
     private void displayHealthStatus(ServerHealthStatus healthStatus) {
+
+        log.info("Displaying server health status");
+
         // Create a panel to display the health status
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));

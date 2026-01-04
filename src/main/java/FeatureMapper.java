@@ -1,3 +1,5 @@
+import utils.LogObj;
+
 import java.io.*;
 import java.util.*;
 
@@ -6,6 +8,9 @@ import java.util.*;
  * Supports parsing key-value format and CSV files.
  */
 public class FeatureMapper {
+
+    // Logger
+    private static LogObj log = new LogObj("FeatureMapper");
     
     /**
      * Parses a string in key-value format and returns a map of features.
@@ -16,6 +21,9 @@ public class FeatureMapper {
      * @throws IllegalArgumentException If the input format is invalid
      */
     public static Map<String, Object> parseKeyValueString(String input) throws IllegalArgumentException {
+
+        log.info("Parsing key-value string: " + input);
+
         Map<String, Object> features = new HashMap<>();
         
         if (input == null || input.trim().isEmpty()) {
@@ -70,6 +78,8 @@ public class FeatureMapper {
      * @throws IllegalArgumentException If the CSV format is invalid
      */
     public static Map<String, Object> parseCsvLine(String headerLine, String dataLine) throws IllegalArgumentException {
+        log.info("Parsing CSV line: " + dataLine);
+
         Map<String, Object> features = new HashMap<>();
         
         if (headerLine == null || headerLine.trim().isEmpty()) {
@@ -108,6 +118,8 @@ public class FeatureMapper {
      * @throws IllegalArgumentException If the CSV format is invalid
      */
     public static List<Map<String, Object>> parseCsvFile(File csvFile) throws IOException, IllegalArgumentException {
+        log.info("Parsing CSV file: " + csvFile.getAbsolutePath());
+
         List<Map<String, Object>> featuresList = new ArrayList<>();
         
         try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
@@ -135,6 +147,8 @@ public class FeatureMapper {
      * @throws IllegalArgumentException If any required feature is missing
      */
     public static void validateFeatures(Map<String, Object> features, List<String> requiredFeatures) throws IllegalArgumentException {
+        log.info("Validating features: " + features);
+
         for (String feature : requiredFeatures) {
             if (!features.containsKey(feature)) {
                 throw new IllegalArgumentException("Missing required feature: " + feature);
@@ -149,6 +163,8 @@ public class FeatureMapper {
      * @return The parsed value (Integer, Double, or String)
      */
     private static Object parseValue(String value) {
+        log.info("Parsing value: " + value);
+
         // Try to parse as integer
         try {
             return Integer.parseInt(value);

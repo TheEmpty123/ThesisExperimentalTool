@@ -1,3 +1,5 @@
+import utils.LogObj;
+
 /**
  * Class to store and manage prediction results from the model server.
  * Contains fields for prediction value, label, confidence, and probabilities.
@@ -10,6 +12,9 @@ public class PredictionResult {
     private double attackProbability;
     private String status;
     private String errorMessage;
+
+    // Logger
+     private static final LogObj log = new LogObj("PredictionResult");
 
     /**
      * Default constructor
@@ -35,6 +40,8 @@ public class PredictionResult {
         this.normalProbability = normalProbability;
         this.attackProbability = attackProbability;
         this.status = "success";
+
+        log.info("PredictionResult created");
     }
 
     /**
@@ -43,6 +50,7 @@ public class PredictionResult {
      * @param errorMessage The error message
      */
     public PredictionResult(String errorMessage) {
+        log.info(errorMessage);
         this.status = "error";
         this.errorMessage = errorMessage;
     }
@@ -149,6 +157,8 @@ public class PredictionResult {
      * @return A formatted string representation of the prediction result
      */
     public String getFormattedResult() {
+        log.info("Generating formatted result");
+
         if ("error".equals(status)) {
             return "Error: " + errorMessage;
         }
@@ -168,6 +178,8 @@ public class PredictionResult {
      * @return A CSV string representation of the prediction result
      */
     public String toCsvString() {
+        log.info("Converting CSV string");
+
         if ("error".equals(status)) {
             return "error,,,," + errorMessage;
         }
@@ -181,6 +193,8 @@ public class PredictionResult {
      * @return The CSV header for prediction results
      */
     public static String getCsvHeader() {
+        log.info("Converting CSV header");
+
         return "prediction,prediction_label,confidence,normal_probability,attack_probability,status,error_message";
     }
 }

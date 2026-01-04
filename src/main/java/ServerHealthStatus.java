@@ -1,3 +1,5 @@
+import utils.LogObj;
+
 /**
  * Represents the health status of the Python Model Server.
  * Contains information about loaded models, server status, and feature count.
@@ -10,6 +12,9 @@ public class ServerHealthStatus {
     private String status;
     private int totalFeatures;
     private String errorMessage;
+
+    // Logger
+     private static final LogObj log = new LogObj("ServerHealthStatus");
 
     /**
      * Constructor for successful health check
@@ -30,6 +35,8 @@ public class ServerHealthStatus {
         this.status = status;
         this.totalFeatures = totalFeatures;
         this.errorMessage = null;
+
+        log.info("ServerHealthStatus created");
     }
 
     /**
@@ -45,6 +52,8 @@ public class ServerHealthStatus {
         this.status = "error";
         this.totalFeatures = 0;
         this.errorMessage = errorMessage;
+
+        log.error("ServerHealthStatus error: " + errorMessage);
     }
 
     /**

@@ -1,3 +1,5 @@
+import utils.LogObj;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -23,6 +25,9 @@ public class ModelServerClient {
     private final int timeout;
     private final int maxRetries;
 
+    //Logger
+    private final LogObj log = new LogObj("ModelServerClient");
+
     /**
      * Constructor - initializes the HTTP client with default settings
      */
@@ -37,6 +42,8 @@ public class ModelServerClient {
      * @param maxRetries Maximum number of retries for failed requests
      */
     public ModelServerClient(int timeoutSeconds, int maxRetries) {
+        log.info("Initializing ModelServerClient with timeout ");
+
         this.timeout = timeoutSeconds;
         this.maxRetries = maxRetries;
 
@@ -55,6 +62,8 @@ public class ModelServerClient {
      * @return The prediction result
      */
     public PredictionResult predict(String serverUrl, String inputData) {
+        log.info("Predicting data from " + serverUrl + " to " + inputData);
+
         try {
             // Parse the input data into a feature map
             Map<String, Object> features = FeatureMapper.parseKeyValueString(inputData);
@@ -76,6 +85,8 @@ public class ModelServerClient {
      * @return List of prediction results
      */
     public List<PredictionResult> batchPredict(String serverUrl, List<String> inputDataList) {
+        log.info("Batch predicting data from " + serverUrl);
+
         List<PredictionResult> results = new ArrayList<>();
 
         for (String inputData : inputDataList) {
@@ -93,6 +104,8 @@ public class ModelServerClient {
      * @return List of prediction results
      */
     public List<PredictionResult> batchPredictFromCsv(String serverUrl, java.io.File csvFile) {
+        log.info("Batch predicting data from " + serverUrl);
+
         List<PredictionResult> results = new ArrayList<>();
 
         try {
@@ -122,6 +135,8 @@ public class ModelServerClient {
      * @return The prediction result
      */
     public PredictionResult sendPredictionRequest(String serverUrl, Map<String, Object> features) {
+        log.info("Sending request to " + serverUrl);
+
         try {
             // Create the JSON request body
             String jsonBody = createJsonRequest(features);
@@ -160,6 +175,8 @@ public class ModelServerClient {
      * @return JSON string in the format {"features": {...}}
      */
     private String createJsonRequest(Map<String, Object> features) {
+        log.info("Creating JSON request");
+
         StringBuilder json = new StringBuilder();
         json.append("{\"features\":{");
 
@@ -195,6 +212,8 @@ public class ModelServerClient {
      */
     private HttpResponse<String> sendWithRetries(HttpRequest request) 
             throws IOException, InterruptedException, TimeoutException {
+        log.info("Sending HTTP request with retries");
+
         Exception lastException = null;
 
         for (int attempt = 0; attempt < maxRetries; attempt++) {
@@ -236,6 +255,8 @@ public class ModelServerClient {
      * @return The prediction result
      */
     private PredictionResult processResponse(HttpResponse<String> response) {
+        log.info("Processing response");
+
         // Check if the request was successful
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             try {
@@ -267,6 +288,8 @@ public class ModelServerClient {
      * @return The escaped string
      */
     private String escapeJson(String input) {
+        log.info("Escaping JSON string");
+
         if (input == null) return "";
         return input.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
@@ -282,6 +305,8 @@ public class ModelServerClient {
      * @return A map of key-value pairs from the JSON
      */
     private Map<String, Object> parseJsonResponse(String jsonString) {
+        log.info("Parsing JSON string");
+
         Map<String, Object> result = new HashMap<>();
 
         // Use regex to extract key-value pairs
@@ -330,6 +355,8 @@ public class ModelServerClient {
      * @param result The map to add the parsed arrays to
      */
     private void parseArrays(String jsonString, Map<String, Object> result) {
+        log.info("Parsing JSON string");
+
         // Find arrays in the JSON string
         Pattern arrayPattern = Pattern.compile("\"([\\w\\.]+)\"\\s*:\\s*\\[(.*?)\\]");
         Matcher arrayMatcher = arrayPattern.matcher(jsonString);
@@ -358,6 +385,8 @@ public class ModelServerClient {
      * @return The parsed value (String, Double, Integer, Boolean)
      */
     private Object parseValue(String value) {
+        log.info("Parsing value");
+
         // Remove quotes if present
         if (value.startsWith("\"") && value.endsWith("\"")) {
             return value.substring(1, value.length() - 1);
@@ -392,6 +421,8 @@ public class ModelServerClient {
      * @return The string value
      */
     private String getStringValue(Map<String, Object> map, String key, String defaultValue) {
+        log.info("Getting string value for key: " + key);
+
         Object value = map.get(key);
         if (value != null) {
             return value.toString();
@@ -408,6 +439,8 @@ public class ModelServerClient {
      * @return The integer value
      */
     private int getIntValue(Map<String, Object> map, String key, int defaultValue) {
+        log.info("Getting int value for key: " + key);
+
         Object value = map.get(key);
         if (value instanceof Number) {
             return ((Number) value).intValue();
@@ -430,6 +463,8 @@ public class ModelServerClient {
      * @return The double value
      */
     private double getDoubleValue(Map<String, Object> map, String key, double defaultValue) {
+        log.info("Getting double value for key: " + key);
+
         Object value = map.get(key);
         if (value instanceof Number) {
             return ((Number) value).doubleValue();
@@ -450,6 +485,8 @@ public class ModelServerClient {
      * @return The server health status
      */
     public ServerHealthStatus checkServerHealth(String serverUrl) {
+        log.info("Checking server health at " + serverUrl);
+
         // Extract the base URL (remove "/predict" if present)
         String baseUrl = serverUrl;
         if (baseUrl.endsWith("/predict")) {
