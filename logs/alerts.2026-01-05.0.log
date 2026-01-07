@@ -1,0 +1,21 @@
+2026-01-05 08:37:41.812 [main] ERROR com.ids.NetworkTrafficAnalyzer - Pcap error: Interface not found: \Device\NPF_{2469318B-8544-42C2-9267-985AE6750D05
+2026-01-05 18:01:01.789 [main] ERROR com.ids.NetworkTrafficAnalyzer - Fatal error: java.lang.InterruptedException
+java.lang.RuntimeException: java.lang.InterruptedException
+	at com.ids.NetworkTrafficAnalyzer.start(NetworkTrafficAnalyzer.java:65)
+	at com.ids.NetworkTrafficAnalyzer.main(NetworkTrafficAnalyzer.java:238)
+Caused by: java.lang.InterruptedException: null
+	at org.pcap4j.core.PcapHandle.doLoop(PcapHandle.java:843)
+	at org.pcap4j.core.PcapHandle.loop(PcapHandle.java:770)
+	at org.pcap4j.core.PcapHandle.loop(PcapHandle.java:741)
+	at com.ids.NetworkTrafficAnalyzer.start(NetworkTrafficAnalyzer.java:59)
+	... 1 common frames omitted
+2026-01-05 18:01:19.293 [main] ERROR com.ids.NetworkTrafficAnalyzer - Fatal error: java.lang.InterruptedException
+java.lang.RuntimeException: java.lang.InterruptedException
+	at com.ids.NetworkTrafficAnalyzer.start(NetworkTrafficAnalyzer.java:65)
+	at com.ids.NetworkTrafficAnalyzer.main(NetworkTrafficAnalyzer.java:238)
+Caused by: java.lang.InterruptedException: null
+	at org.pcap4j.core.PcapHandle.doLoop(PcapHandle.java:843)
+	at org.pcap4j.core.PcapHandle.loop(PcapHandle.java:770)
+	at org.pcap4j.core.PcapHandle.loop(PcapHandle.java:741)
+	at com.ids.NetworkTrafficAnalyzer.start(NetworkTrafficAnalyzer.java:59)
+	... 1 common frames omitted
