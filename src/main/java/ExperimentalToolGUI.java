@@ -1,4 +1,4 @@
-
+import com.ids.NetworkTrafficAnalyzer;
 import utils.LogObj;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -83,6 +83,23 @@ public class ExperimentalToolGUI extends JFrame {
     private JMenuItem exportMenuItem;
     private JMenuItem batchProcessMenuItem;
 
+    // Network Traffic Analyzer components
+    private JTextArea outputLogArea;
+    private JTextField networkInterfaceField;
+    private JSpinner packetCountSpinner;
+    private JLabel capturedCountLabel;
+    private JLabel normalCountLabel;
+    private JLabel attackCountLabel;
+    private JButton startCaptureButton;
+    private JButton stopCaptureButton;
+    private JButton listInterfacesButton;
+    private volatile boolean isCapturing = false;
+    private int totalCaptured = 0;
+    private int normalCount = 0;
+    private int attackCount = 0;
+    private NetworkTrafficAnalyzer analyzer;
+    private Thread captureThread;
+
     // Logger
     private static final LogObj log = new LogObj("ExperimentalToolGUI");
 
@@ -127,6 +144,9 @@ public class ExperimentalToolGUI extends JFrame {
         serverPanel.add(urlPanel, BorderLayout.CENTER);
         serverPanel.add(healthCheckButton, BorderLayout.EAST);
 
+        // Create tabbed pane
+        JTabbedPane tabbedPane = new JTabbedPane();
+
         // Create the input panel (left side)
         JPanel inputPanel = createInputPanel();
 
@@ -141,9 +161,20 @@ public class ExperimentalToolGUI extends JFrame {
         );
         splitPane.setResizeWeight(0.4); // 40% left, 60% right
 
+        // Create manual prediction tab panel
+        JPanel manualPredictionTab = new JPanel(new BorderLayout());
+        manualPredictionTab.add(splitPane, BorderLayout.CENTER);
+
+        // Create network traffic analyzer tab
+        JPanel trafficAnalyzerTab = createTrafficAnalyzerPanel();
+
+        // Add tabs to tabbed pane
+        tabbedPane.addTab("Manual Prediction", manualPredictionTab);
+        tabbedPane.addTab("Network Traffic Analyzer", trafficAnalyzerTab);
+
         // Add all panels to the main panel
         mainPanel.add(serverPanel, BorderLayout.NORTH);
-        mainPanel.add(splitPane, BorderLayout.CENTER);
+        mainPanel.add(tabbedPane, BorderLayout.CENTER);
 
         // Add the main panel to the frame
         add(mainPanel);
@@ -1631,5 +1662,375 @@ public class ExperimentalToolGUI extends JFrame {
         updateStatus(healthStatus.isHealthy() 
                 ? "Server health check completed: Server is healthy." 
                 : "Server health check completed: Issues detected.");
+    }
+
+    /**
+     * Creates the Network Traffic Analyzer panel
+     * 
+     * @return The traffic analyzer panel
+     */
+    private JPanel createTrafficAnalyzerPanel() {
+        log.info("Creating Network Traffic Analyzer panel");
+
+        JPanel analyzerPanel = new JPanel(new BorderLayout(10, 10));
+        analyzerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Control panel (top)
+        JPanel controlPanel = new JPanel(new GridBagLayout());
+        controlPanel.setBorder(BorderFactory.createTitledBorder("Capture Controls"));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(5, 5, 5, 5);
+
+        // Network Interface input
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0.0;
+        controlPanel.add(new JLabel("Network Interface:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        networkInterfaceField = new JTextField("eth0");
+        controlPanel.add(networkInterfaceField, gbc);
+
+        gbc.gridx = 2;
+        gbc.weightx = 0.0;
+        listInterfacesButton = new JButton("List Interfaces");
+        listInterfacesButton.addActionListener(e -> listNetworkInterfaces());
+        controlPanel.add(listInterfacesButton, gbc);
+
+        // Packet Count input
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.weightx = 0.0;
+        controlPanel.add(new JLabel("Packet Count:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        SpinnerNumberModel spinnerModel = new SpinnerNumberModel(100, 1, 10000, 10);
+        packetCountSpinner = new JSpinner(spinnerModel);
+        controlPanel.add(packetCountSpinner, gbc);
+
+        // Buttons
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 3;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.CENTER;
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        startCaptureButton = new JButton("Start Capture");
+        startCaptureButton.setBackground(new Color(76, 175, 80));
+        startCaptureButton.setForeground(Color.BLACK);
+        startCaptureButton.setFont(startCaptureButton.getFont().deriveFont(Font.BOLD));
+        startCaptureButton.addActionListener(e -> startPacketCapture());
+
+        stopCaptureButton = new JButton("Stop Capture");
+        stopCaptureButton.setBackground(new Color(244, 67, 54));
+        stopCaptureButton.setForeground(Color.WHITE);
+        stopCaptureButton.setFont(stopCaptureButton.getFont().deriveFont(Font.BOLD));
+        stopCaptureButton.setEnabled(false);
+        stopCaptureButton.addActionListener(e -> stopPacketCapture());
+
+        buttonPanel.add(startCaptureButton);
+        buttonPanel.add(stopCaptureButton);
+        controlPanel.add(buttonPanel, gbc);
+
+        // Statistics panel
+        JPanel statsPanel = new JPanel(new GridLayout(1, 3, 10, 0));
+        statsPanel.setBorder(BorderFactory.createTitledBorder("Statistics"));
+
+        capturedCountLabel = new JLabel("Captured: 0", JLabel.CENTER);
+        capturedCountLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        normalCountLabel = new JLabel("Normal: 0", JLabel.CENTER);
+        normalCountLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        normalCountLabel.setForeground(new Color(76, 175, 80));
+        attackCountLabel = new JLabel("Attack: 0", JLabel.CENTER);
+        attackCountLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        attackCountLabel.setForeground(new Color(244, 67, 54));
+
+        statsPanel.add(capturedCountLabel);
+        statsPanel.add(normalCountLabel);
+        statsPanel.add(attackCountLabel);
+
+        // Output log area
+        outputLogArea = new JTextArea();
+        outputLogArea.setEditable(false);
+        outputLogArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        outputLogArea.setLineWrap(false);
+        JScrollPane logScrollPane = new JScrollPane(outputLogArea);
+        logScrollPane.setBorder(BorderFactory.createTitledBorder("Output Log"));
+
+        // Combine control and stats panels
+        JPanel topPanel = new JPanel(new BorderLayout(10, 10));
+        topPanel.add(controlPanel, BorderLayout.NORTH);
+        topPanel.add(statsPanel, BorderLayout.SOUTH);
+
+        // Add components to main analyzer panel
+        analyzerPanel.add(topPanel, BorderLayout.NORTH);
+        analyzerPanel.add(logScrollPane, BorderLayout.CENTER);
+
+        return analyzerPanel;
+    }
+
+    /**
+     * Lists available network interfaces
+     * TODO: Implement actual network interface detection logic
+     */
+    private void listNetworkInterfaces() {
+        log.info("Listing network interfaces");
+        
+        appendToLog("Listing available network interfaces...");
+        appendToLog("=" .repeat(60));
+
+        try {
+            String iList = NetworkTrafficAnalyzer.listInterfaces();
+            appendToLog(iList);
+        } catch (Exception e) {
+            appendToLog("Error detecting interfaces: " + e.getMessage());
+            log.error("Error listing network interfaces", e);
+        }
+
+        appendToLog("=" .repeat(60));
+    }
+
+    /**
+     * Starts packet capture process
+     */
+    private void startPacketCapture() {
+        log.info("Starting packet capture");
+
+        if (isCapturing) {
+            showWarning("Already Capturing", "Packet capture is already in progress.");
+            return;
+        }
+
+        String selectedInterface = networkInterfaceField.getText().trim();
+        int packetCount = (Integer) packetCountSpinner.getValue();
+
+        if (selectedInterface.isEmpty()) {
+            showWarning("No Interface", "Please enter a network interface name.");
+            return;
+        }
+
+        // Reset counters
+        totalCaptured = 0;
+        normalCount = 0;
+        attackCount = 0;
+        updateCaptureStatistics();
+
+        outputLogArea.setText("");
+        appendToLog("Starting packet capture on " + selectedInterface);
+        appendToLog("Target packet count: " + packetCount);
+        appendToLog("=" .repeat(60));
+
+        isCapturing = true;
+        startCaptureButton.setEnabled(false);
+        stopCaptureButton.setEnabled(true);
+        listInterfacesButton.setEnabled(false);
+        networkInterfaceField.setEnabled(false);
+        packetCountSpinner.setEnabled(false);
+
+        // Create action callback for logging
+        com.ids.Action logAction = new com.ids.Action() {
+            @Override
+            public void run(String message) {
+                // Update on EDT
+                SwingUtilities.invokeLater(() -> {
+                    appendToLog(message);
+
+                    // Parse message to update statistics
+                    if (message.contains("Packet #")) {
+                        totalCaptured++;
+                    }
+                    if (message.contains("ATTACK")) {
+                        attackCount++;
+                    } else if (message.contains("NORMAL")) {
+                        normalCount++;
+                    }
+
+                    updateCaptureStatistics();
+                });
+            }
+        };
+
+        // Start capture in background thread
+        captureThread = new Thread(() -> {
+            try {
+                appendToLog("Initializing packet capture...");
+
+                // Initialize analyzer
+                analyzer = new NetworkTrafficAnalyzer(selectedInterface);
+
+                appendToLog("Analyzer initialized successfully");
+                appendToLog("Starting capture loop...");
+
+                // Start the actual capture with callback
+                capturePacketsWithCount(analyzer, packetCount, logAction);
+
+            } catch (Exception e) {
+                String errorMsg = "Error during packet capture: " + e.getMessage();
+                log.error(errorMsg, e);
+                SwingUtilities.invokeLater(() -> {
+                    appendToLog(errorMsg);
+                    showError("Capture Error", errorMsg);
+                    stopPacketCaptureCleanup();
+                });
+            }
+        }, "PacketCaptureThread");
+
+        captureThread.start();
+    }
+
+    /**
+     * Capture packets with a specific count limit
+     */
+    private void capturePacketsWithCount(NetworkTrafficAnalyzer analyzer, int maxPackets, com.ids.Action logAction) {
+        try {
+            // Use the analyzer to capture packets
+            int[] capturedCount = {0};
+
+            // Create a custom action that counts packets
+            com.ids.Action countingAction = new com.ids.Action() {
+                @Override
+                public void run(String message) {
+                    capturedCount[0]++;
+                    logAction.run(message);
+
+                    // Stop if we've reached the max packet count
+                    if (capturedCount[0] >= maxPackets) {
+                        if (!isCapturing) return;
+                        SwingUtilities.invokeLater(() -> {
+                            appendToLog("Target packet count reached: " + maxPackets);
+                            stopPacketCapture();
+                        });
+                    }
+                }
+            };
+
+            // Start the analyzer with our counting action
+//            analyzer.start();
+
+            // Simulate packet processing (replace with actual implementation)
+            // This is where you would integrate with the real packet capture
+            simulatePacketCapture(maxPackets, countingAction);
+
+        } catch (Exception e) {
+            log.error("Error in packet capture loop", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Simulate packet capture for demonstration
+     * TODO: Replace with actual NetworkTrafficAnalyzer integration
+     */
+    private void simulatePacketCapture(int maxPackets, com.ids.Action logAction) {
+        // Add shutdown hook
+//        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+//            System.out.println("\n\nShutting down...");
+//            analyzer.stop();
+//        }));
+
+        analyzer.start(outputLogArea, maxPackets, capturedCountLabel, normalCountLabel, attackCountLabel, logAction);
+
+        // Cleanup after capture completes
+//        synchronized (NetworkTrafficAnalyzer.class) {
+//            try {
+//                NetworkTrafficAnalyzer.class.wait();
+//            } catch (InterruptedException e) {
+//                log.error("Capture simulation interrupted", e);
+////                throw new RuntimeException(e);
+//            }
+//        }
+//        SwingUtilities.invokeLater(this::stopPacketCaptureCleanup);
+    }
+
+    /**
+     * Stops packet capture process
+     */
+    private void stopPacketCapture() {
+        log.info("Stopping packet capture");
+
+        if (!isCapturing) {
+            return;
+        }
+
+        isCapturing = false;
+        appendToLog("Stop requested by user...");
+
+        // Stop the analyzer if it exists
+        if (analyzer != null) {
+            try {
+                analyzer.stop();
+                analyzer.close();
+            } catch (Exception e) {
+                log.error("Error stopping analyzer", e);
+            }
+        }
+
+        // Interrupt the capture thread
+        if (captureThread != null && captureThread.isAlive()) {
+            captureThread.interrupt();
+        }
+
+        stopPacketCaptureCleanup();
+    }
+
+    /**
+     * Cleanup UI after packet capture stops
+     */
+    private void stopPacketCaptureCleanup() {
+        isCapturing = false;
+        startCaptureButton.setEnabled(true);
+        stopCaptureButton.setEnabled(false);
+        listInterfacesButton.setEnabled(true);
+        networkInterfaceField.setEnabled(true);
+        packetCountSpinner.setEnabled(true);
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            log.error("Packet capture interrupted", e);
+//            throw new RuntimeException(e);
+        }
+        appendToLog("=" .repeat(60));
+        appendToLog("Packet capture completed.");
+        appendToLog(String.format("Total: %d | Normal: %d | Attack: %d",
+                totalCaptured, normalCount, attackCount));
+    }
+
+    /**
+     * Stops packet capture process
+     */
+//    private void stopPacketCapture() {
+//        log.info("Stopping packet capture");
+//
+//        if (!isCapturing) {
+//            return;
+//        }
+//
+//        isCapturing = false;
+//        appendToLog("Stop requested by user...");
+//    }
+
+    /**
+     * Updates the capture statistics labels
+     */
+    private void updateCaptureStatistics() {
+        capturedCountLabel.setText("Captured: " + totalCaptured);
+        normalCountLabel.setText("Normal: " + normalCount);
+        attackCountLabel.setText("Attack: " + attackCount);
+    }
+
+    /**
+     * Appends a message to the output log
+     *
+     * @param message The message to append
+     */
+    private void appendToLog(String message) {
+        outputLogArea.append(message + "\n");
+        outputLogArea.setCaretPosition(outputLogArea.getDocument().getLength());
     }
 }

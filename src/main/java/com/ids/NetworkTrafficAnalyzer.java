@@ -9,6 +9,7 @@ import org.pcap4j.packet.Packet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.swing.*;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -26,6 +27,11 @@ public class NetworkTrafficAnalyzer implements Closeable {
     private final ExecutorService executorService;
     private volatile boolean isRunning = false;
     private Thread captureThread;
+    JTextArea outputLog;
+    JLabel capturedCountLabel;
+    JLabel normalCountLabel;
+    JLabel attackCountLabel;
+    Action logAction;
 
     private static final String BACKEND_URL = "http://localhost:8888/predict";
     private static final int PACKET_COUNT = -1; // Capture unlimited packets
@@ -153,24 +159,41 @@ public class NetworkTrafficAnalyzer implements Closeable {
         }
     }
 
+    int capturedCount = 0;
+    int normalCount = 0;
+    int attackCount = 0;
     /**
      * Log prediction result
      */
     private void logPredictionResult(String srcIp, String dstIp,
                                      PredictionClient.PredictionResult result) {
-        String logLevel = "attack".equalsIgnoreCase(result.getPrediction()) ? "ALERT" : "INFO";
-
+        String logLevel = "attack".equalsIgnoreCase(result.getPredictionLabel()) ? "ALERT" : "INFO";
+        capturedCount++;
         String message = String.format(
-                "[%s] Traffic from %s to %s | Prediction: %s | Confidence: %.2f%%",
+                "[%s] Packet #%s Traffic from %s to %s | Prediction: %s | Confidence: %.2f%%",
                 logLevel,
+                capturedCount,
                 srcIp,
                 dstIp,
-                result.getPrediction(),
+                result.getPredictionLabel().toUpperCase(),
                 result.getConfidence() * 100
         );
 
-        if ("attack".equalsIgnoreCase(result.getPrediction())) {
-//            logger.error("{} | Attack Type: {}", message, result.getAttackType());
+
+        if (logAction != null) {
+            logAction.run(message);
+//            if ("attack".equalsIgnoreCase(result.getPredictionLabel())) {
+//                attackCount++;
+//                attackCountLabel.setText("Attack: " + attackCount);
+//            } else {
+//                normalCount++;
+//                normalCountLabel.setText("Normal: " + normalCount);
+//            }
+//            capturedCountLabel.setText("Captured: " + capturedCount);
+        }
+
+        if ("attack".equalsIgnoreCase(result.getPredictionLabel())) {
+            logger.error("{} | Attack Type: {}", message);
         } else {
             logger.info(message);
         }
@@ -208,30 +231,40 @@ public class NetworkTrafficAnalyzer implements Closeable {
     /**
      * List available network interfaces
      */
-    public static void listInterfaces() throws PcapNativeException {
+    public static String listInterfaces() throws PcapNativeException {
         List<PcapNetworkInterface> allDevs = Pcaps.findAllDevs();
-
+        StringBuilder o = new StringBuilder();
         if (allDevs.isEmpty()) {
-            System.out.println("No network interfaces found!");
-            return;
+            o.append("No network interfaces found!");
+            System.out.println(o);
+            return o.toString();
         }
 
+        o.append("\n=== Available Network Interfaces ===");
         System.out.println("\n=== Available Network Interfaces ===");
         for (int i = 0; i < allDevs.size(); i++) {
             PcapNetworkInterface device = allDevs.get(i);
+            o.append("\n" + (i + 1) + ". " + device.getName());
             System.out.println((i + 1) + ". " + device.getName());
+
             if (device.getDescription() != null) {
+                o.append("\n   " + device.getDescription());
                 System.out.println("   " + device.getDescription());
             }
             if (!device.getAddresses().isEmpty()) {
+                o.append("\n   Addresses: ");
                 System.out.print("   Addresses: ");
-                device.getAddresses().forEach(addr ->
-                        System.out.print(addr.getAddress().getHostAddress() + " ")
-                );
+                device.getAddresses().forEach(addr -> {
+                    o.append(addr.getAddress().getHostAddress() + " ");
+                    System.out.print(addr.getAddress().getHostAddress() + " ");
+                });
+                o.append("\n");
                 System.out.println();
             }
         }
+        o.append("====================================\n");
         System.out.println("====================================\n");
+        return o.toString();
     }
 
     private void reinitializeHandle() throws PcapNativeException {
@@ -306,5 +339,113 @@ public class NetworkTrafficAnalyzer implements Closeable {
             logger.error("Fatal error: {}", e.getMessage(), e);
             System.exit(1);
         }
+    }
+
+    public static void startCapture(String iName, int packageCount) {
+        try {
+            String interfaceName = iName;
+
+            try {
+                // Create analyzer
+                NetworkTrafficAnalyzer analyzer = new NetworkTrafficAnalyzer(interfaceName);
+
+                // Add shutdown hook
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    System.out.println("\n\nShutting down...");
+                    analyzer.stop();
+                }));
+
+                logger.info("========== Network Traffic Analyzer Started ==========");
+                logger.info("Interface: {}", interfaceName);
+                logger.info("Backend URL: {}", BACKEND_URL);
+                logger.info("Thread Pool Size: {}", THREAD_POOL_SIZE);
+                logger.info("========================================================");
+
+                // Start capturing (non-blocking)
+                analyzer.start();
+
+                // Keep main thread alive
+                System.out.println("Packet capture running. Press Ctrl+C to stop.\n");
+
+                synchronized (NetworkTrafficAnalyzer.class) {
+                    NetworkTrafficAnalyzer.class.wait();
+                }
+            } catch (Exception e) {
+                logger.error("Main thread interrupted: {}", e.getMessage(), e);
+            }
+
+        } catch (Exception e) {
+            logger.error("Fatal error: {}", e.getMessage(), e);
+            System.exit(1);
+        }
+    }
+
+    public void start(JTextArea outputLog, int maxPackets, JLabel capturedCountLabel, JLabel normalCountLabel, JLabel attackCountLabel,Action logAction) {
+        this.outputLog = outputLog;
+        this.logAction = logAction;
+        this.capturedCountLabel = capturedCountLabel;
+        this.normalCountLabel = normalCountLabel;
+        this.attackCountLabel = attackCountLabel;
+
+        appendToLog("Starting...");
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            appendToLog("\n\nShutting down...");
+            stop();
+        }));
+        appendToLog("========== Network Traffic Analyzer Started ==========");
+//        logger.info("Interface: {}", interfaceName);
+        appendToLog("Backend URL: " + BACKEND_URL);
+        appendToLog("Thread Pool Size: " + THREAD_POOL_SIZE);
+        appendToLog("========================================================");
+
+
+
+        if (isRunning) {
+            appendToLog("Capture already running");
+            return;
+        }
+
+        isRunning = true;
+
+        captureThread = new Thread(() -> {
+            try {
+                appendToLog("CAPTURE LOOP START");
+
+                handle.loop(-1, (PacketListener) packet ->
+                        executorService.execute(() -> processPacket(packet))
+                );
+
+            } catch (InterruptedException e) {
+                appendToLog("Capture thread interrupted");
+            } catch (PcapNativeException | NotOpenException e) {
+                appendToLog("Capture error" + e.getMessage());
+            } finally {
+                isRunning = false;
+                appendToLog("CAPTURE LOOP END");
+            }
+
+        }, "PacketCaptureThread2");
+
+        captureThread.start();
+
+//        synchronized (NetworkTrafficAnalyzer.class) {
+//            try {
+//                NetworkTrafficAnalyzer.class.wait();
+//            } catch (InterruptedException e) {
+//                logger.error("Capture simulation interrupted", e);
+////                throw new RuntimeException(e);
+//            }
+//        }
+    }
+
+    /**
+     * Appends a message to the output log
+     *
+     * @param message The message to append
+     */
+    private void appendToLog(String message) {
+        if (outputLog == null) return;
+        outputLog.append(message + "\n");
+        outputLog.setCaretPosition(outputLog.getDocument().getLength());
     }
 }
